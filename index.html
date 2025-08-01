@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhotoFlash</title>
+<style>
+  body {
+    background-color: #000;
+    color: #00ff55;
+    font-family: 'Courier New', monospace;
+    text-align: center;
+    margin: 0;
+    padding: 20px;
+    overflow: hidden;
+  }
+  h2 {
+    margin-bottom: 25px;
+    font-size: 1.8rem;
+    text-shadow: 0 0 10px #00ff55;
+    animation: glow 2s infinite alternate;
+  }
+  input[type="file"], button {
+    margin: 12px;
+    padding: 10px 16px;
+    border: 2px solid #00ff55;
+    border-radius: 6px;
+    background: transparent;
+    color: #00ff55;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.3s, color 0.3s, transform 0.2s, box-shadow 0.3s;
+  }
+  button:hover, input[type="file"]:hover {
+    background: #00ff55;
+    color: #000;
+    transform: scale(1.05);
+    box-shadow: 0 0 10px #00ff55;
+  }
+  #preview {
+    margin-top: 20px;
+    max-width: 320px;
+    border: 2px solid #00ff55;
+    border-radius: 8px;
+    box-shadow: 0 0 15px #00ff55;
+  }
+  #status {
+    margin-top: 15px;
+    color: #00ffaa;
+    text-shadow: 0 0 5px #00ffaa;
+    min-height: 24px;
+    font-size: 0.95rem;
+  }
+  @keyframes glow {
+    from { text-shadow: 0 0 5px #00ff55; }
+    to { text-shadow: 0 0 20px #00ff55; }
+  }
+  /* subtle moving gradient background */
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(120deg, rgba(0,255,85,0.05) 25%, transparent 25%, transparent 50%, rgba(0,255,85,0.05) 50%, rgba(0,255,85,0.05) 75%, transparent 75%, transparent);
+    background-size: 50px 50px;
+    animation: move 4s linear infinite;
+    z-index: -1;
+  }
+  @keyframes move {
+    from { transform: translate(0,0); }
+    to { transform: translate(-50px,-50px); }
+  }
+</style>
+</head>
+<body>
+<h2>PhotoFlash</h2>
+<p>Blind File into Image</p>
+<input type="file" id="imageInput" accept="image/*" />
+<input type="file" id="fileInput" />
+<br/>
+<button onclick="blindFile()">Blind & Download Image</button>
+<div id="status"></div>
+<img id="preview" />
+
+<script>
+async function blindFile() {
+  const imageFile = document.getElementById('imageInput').files[0];
+  const hiddenFile = document.getElementById('fileInput').files[0];
+  const status = document.getElementById('status');
+
+  if (!imageFile || !hiddenFile) {
+    typeText(status, 'Error: Please select both image and file.');
+    return;
+  }
+
+  try {
+    typeText(status, 'Processing...');
+
+    const imageArrayBuffer = await fileToArrayBuffer(imageFile);
+    const hiddenArrayBuffer = await fileToArrayBuffer(hiddenFile);
+
+    const marker = new TextEncoder().encode('|||HIDDEN_FILE_START|||');
+    const combinedLength = imageArrayBuffer.byteLength + marker.byteLength + hiddenArrayBuffer.byteLength;
+    const combinedArray = new Uint8Array(combinedLength);
+
+    combinedArray.set(new Uint8Array(imageArrayBuffer), 0);
+    combinedArray.set(marker, imageArrayBuffer.byteLength);
+    combinedArray.set(new Uint8Array(hiddenArrayBuffer), imageArrayBuffer.byteLength + marker.byteLength);
+
+    const newImageBlob = new Blob([combinedArray], { type: imageFile.type });
+    const newImageUrl = URL.createObjectURL(newImageBlob);
+
+    // Auto download
+    const a = document.createElement('a');
+    a.href = newImageUrl;
+    a.download = 'blinded_' + imageFile.name;
+    a.click();
+
+    document.getElementById('preview').src = newImageUrl;
+
+    typeText(status, 'File successfully embedded into image.');
+  } catch (err) {
+    console.error(err);
+    typeText(status, 'Error: Something went wrong.');
+  }
+}
+
+function fileToArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = e => reject(e);
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// typing effect
+function typeText(element, text, speed=30) {
+  element.textContent = '';
+  let i = 0;
+  (function type() {
+    if (i < text.length) {
+      element.textContent += text.charAt(i);
+      i++;
+      setTimeout(type, speed);
+    }
+  })();
+}
+</script>
+</body>
+</html>
